@@ -6,7 +6,7 @@
   },
 
   "database": {
-    "uri": "mongodb://localhost:27017",
+    "uri": "mongodb://admin:admin@localhost:6001",
     "name": "rustapi-test"
   },
 
