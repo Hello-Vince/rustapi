@@ -1,5 +1,9 @@
 use axum::http::StatusCode;
-use axum::{routing::post, Json, Router};
+use axum::{
+  extract::Path,
+  routing::{get, post},
+  Json, Router,
+};
 use bson::doc;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -10,12 +14,15 @@ use crate::models::user::{PublicUser, User};
 use crate::settings::SETTINGS;
 use crate::utils::custom_response::{CustomResponse, CustomResponseBuilder};
 use crate::utils::models::ModelExt;
+use crate::utils::to_object_id::to_object_id;
 use crate::utils::token;
+use crate::utils::token::TokenUser;
 
 pub fn create_route() -> Router {
   Router::new()
     .route("/users", post(create_user))
     .route("/users/authenticate", post(authenticate_user))
+    .route("/users/:id", get(get_user_by_id))
 }
 
 async fn create_user(Json(body): Json<CreateBody>) -> Result<CustomResponse<PublicUser>, Error> {
@@ -78,6 +85,27 @@ async fn authenticate_user(
   };
 
   Ok(Json(res))
+}
+
+async fn get_user_by_id(
+  _user: TokenUser,
+  Path(id): Path<String>,
+) -> Result<Json<PublicUser>, Error> {
+  let user_id = to_object_id(id)?;
+  let user = User::find_one(doc! { "_id": user_id}, None)
+    .await?
+    .map(PublicUser::from);
+
+  let user = match user {
+    Some(user) => user,
+    None => {
+      debug!("User not found, returning 404 status code");
+      return Err(Error::not_found());
+    }
+  };
+
+  debug!("Returning user");
+  Ok(Json(user))
 }
 
 // TODO: Validate password length
